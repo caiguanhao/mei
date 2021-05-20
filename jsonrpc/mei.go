@@ -37,6 +37,8 @@ type (
 		dimesToReceive        int
 		dimesReceived         int
 		maxDimesForGiveChange int
+
+		existingSession chan bool
 	}
 
 	Client interface {
@@ -66,6 +68,10 @@ type (
 		DimesLeft             int
 		MaxDimesForGiveChange int
 		Completed             bool
+	}
+
+	actionMessage struct {
+		Action string
 	}
 
 	receivedMessage struct {
@@ -197,6 +203,12 @@ func (m *MEI) GiveChange(args *GiveChangeArgs, reply *bool) (err error) {
 }
 
 func (m *MEI) NewSession(args *NewSessionArgs, reply *string) (err error) {
+	if m.existingSession == nil {
+		log.Println("no existing session")
+	} else {
+		close(m.existingSession)
+	}
+
 	client := m.getClient(args.ClientID)
 	if client == nil {
 		return ErrNoSuchClient
@@ -346,6 +358,10 @@ func (m *MEI) process(server *http.Server, client Client, args *NewSessionArgs) 
 	after := schedule()
 	m.dimesToReceive = args.Dimes
 	m.dimesReceived = 0
+	m.existingSession = make(chan bool)
+	defer func() {
+		m.existingSession = nil
+	}()
 loop:
 	for {
 		select {
@@ -361,6 +377,7 @@ loop:
 				break loop
 			}
 			after = schedule()
+			m.broadcast(actionMessage{Action: "resetTimer"})
 			continue loop // since "after" is updated
 		case ret := <-cashChan.(chan []byte):
 			var base float64 = 1.0
@@ -370,13 +387,17 @@ loop:
 				base = 100.0
 			}
 			n := float64(bytes2int(ret[3], ret[4], ret[5])) / base
-			if m.received("cash", n) {
+			if m.received("bill", n) {
 				break loop
 			}
 			after = schedule()
+			m.broadcast(actionMessage{Action: "resetTimer"})
 			continue loop // since "after" is updated
 		case <-after:
 			break loop
+		case <-m.existingSession:
+			log.Println("aborting previous session")
+			return
 		}
 	}
 

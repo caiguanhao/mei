@@ -49,7 +49,7 @@ func main() {
 		return
 	}
 
-	b := base.NewBase(*device, verbosive)
+	b := base.NewBase(verbosive)
 	err := b.Open(*device, func() (base.Port, error) {
 		return serial.Open(*device, &serial.Mode{
 			BaudRate: *baudRate,
@@ -147,7 +147,7 @@ func searchPort(baudRate int) string {
 	pathChan := make(chan string)
 	for _, path := range portPaths {
 		go func(path string) {
-			b := base.NewBase(path, verbosive)
+			b := base.NewBase(verbosive)
 			defer b.Close()
 			if b.Open(path, func() (base.Port, error) {
 				return serial.Open(path, &serial.Mode{

@@ -29,13 +29,12 @@ type (
 	GiveChangeArgs = jsonrpc.GiveChangeArgs
 )
 
-func NewBase(path string, verbosive bool) (b *Base) {
+func NewBase(verbosive bool) (b *Base) {
 	var clients sync.Map
 	var channels sync.Map
 	b = &Base{
 		jsonrpc: &jsonrpc.MEI{
 			Clients:   &clients,
-			Path:      path,
 			Verbosive: verbosive,
 		},
 		channels: &channels,
@@ -54,6 +53,7 @@ func (b *Base) Open(path string, generator func() (Port, error)) (err error) {
 		return
 	}
 	b.portPath = path
+	b.jsonrpc.Path = path
 	go b.read()
 	return
 }
